@@ -8,14 +8,13 @@ class ConnectionAMatricesBase(nn.Module):
     A_i(x) = sum_k A_k * pd_{x_i} log(w_k)
     Letters: w_k = {x1+cy, x1-cy, x2+cy, x2-cy, x1+x2}
     """
-
     def __init__(self, n_basis=4, n_letters=5, cy_val=None):
         super().__init__()
         self.n_basis = n_basis
         self.n_letters = n_letters
         self.cy_val = cy_val
 
-    # ---------- Static: compute ∂log(w)/ ∂x_i ----------
+    # ---------- Static: compute pd log(w)/ pd x_i ----------
     @staticmethod
     def dlog_partials(x1: torch.Tensor, x2: torch.Tensor, cy_val: float):
         """
@@ -26,12 +25,12 @@ class ConnectionAMatricesBase(nn.Module):
         zeros_x1 = torch.zeros_like(x1)
         zeros_x2 = torch.zeros_like(x2)
 
-        w1, w2 = x1 + cy_val, x1 - cy_val
-        w3, w4 = x2 + cy_val, x2 - cy_val
+        w1, w3 = x1 + cy_val, x1 - cy_val
+        w2, w4 = x2 + cy_val, x2 - cy_val
         w5 = x1 + x2
 
-        dlog_dx1 = torch.stack([1/w1, 1/w2, zeros_x1, zeros_x1, 1/w5], dim=1)
-        dlog_dx2 = torch.stack([zeros_x2, zeros_x2, 1/w3, 1/w4, 1/w5], dim=1)
+        dlog_dx1 = torch.stack([1/w1, zeros_x1, 1/w3, zeros_x1, 1/w5], dim=1)
+        dlog_dx2 = torch.stack([zeros_x2, 1/w2, zeros_x2, 1/w4, 1/w5], dim=1)
         return dlog_dx1, dlog_dx2
 
     # ---------- Core Shared Forward ----------
@@ -68,6 +67,8 @@ class ConnectionAMatrices(ConnectionAMatricesBase):
         super().__init__(n_basis_local, n_letters, cy_val)
         self.ak_list = nn.ParameterList([
             nn.Parameter(0.01 * torch.randn(n_basis_local, n_basis_local))
+            # 0.01: Initialize the matrices to be nearly smooth (close to zero),
+            # but retain slight perturbations to trigger learning.
             for _ in range(n_letters)
         ])
 
