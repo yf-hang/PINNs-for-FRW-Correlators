@@ -2,15 +2,16 @@
 <body bgcolor="#F5F5DC">
 
 <div><h2>Epsilon = -1.05, c = 25.0</h2></div>
-	
+
 <div><h4>Loss: Total + CDE + BC</h4></div>
 <div>
 	<img src="./cy_p25_0/1_losses/losses.png" width="600" height="400">
 </div>
-<div><h4>Loss: Total Only</h4></div>
+<div><h4>Loss: Total</h4></div>
 <div>
 	<img src="./cy_p25_0/1_losses/loss_tot.png" width="600" height="450">
 </div>
+
 
 <div><h4>Re vs Im</h4></div>
 
@@ -34,7 +35,9 @@
 </table>
 
 
-<div><h4>Absolute Difference</h4></div>
+
+
+<div><h4>Absolute Difference |True - Pred|</h4></div>
 
 <table border="0">
 <tr>
@@ -56,6 +59,32 @@
 </table>
 
 
+
+<div><h4>Relative Difference |True - Pred|/|True|</h4></div>
+
+<table border="0">
+<tr>
+	<td>
+		<img src="./cy_p25_0/2_true_pred/P1_RelDiff_I1.png" width="300" height="200">
+	</td>
+	<td>
+		<img src="./cy_p25_0/2_true_pred/P1_RelDiff_I2.png" width="300" height="200">
+	</td>
+</tr>
+<tr>
+	<td>
+		<img src="./cy_p25_0/2_true_pred/P1_RelDiff_I3.png" width="300" height="200">
+	</td>
+	<td>
+		<img src="./cy_p25_0/2_true_pred/P1_RelDiff_I4.png" width="300" height="200">
+	</td>
+</tr>
+<tr>
+	<td>
+		<img src="./cy_p25_0/2_true_pred/P1_RelDiff_Ave.png" width="300" height="200">
+	</td>
+</tr>
+</table>
 
 
 <div><h4>Re(Pred - True)</h4></div>
@@ -101,23 +130,6 @@
 	</td>
 </tr>
 </table>
-
-
-
-<div><h4>Ave(Pred - True)</h4></div>
-
-<table border="0">
-<tr>
-	<td>
-		<img src="./cy_p25_0/3_true_pred_x1_x2/P1_ReDiff_Ave.png" width="300" height="200">
-	</td>
-	<td>
-		<img src="./cy_p25_0/3_true_pred_x1_x2/P1_ImDiff_Ave.png" width="300" height="200">
-	</td>
-</tr>
-</table>
-
-
 
 
 <div><h4>Cosine Similarity</h4></div>
