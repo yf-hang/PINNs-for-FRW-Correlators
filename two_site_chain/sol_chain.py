@@ -19,101 +19,24 @@ def _w_select(x1: float, x2: float, c: float, *idx):
 
 def _eps_to_n_int(eps: float, tol=1e-12):
     epsm = mp.mpf(eps)
-    if mp.fabs(epsm + 1) < tol: return 1
-    if mp.fabs(epsm + 2) < tol: return 2
-    if mp.fabs(epsm + 3) < tol: return 3
+    # Support any negative integer eps = -n, n >= 1.
+    n = int(mp.nint(-epsm))
+    if n >= 1 and mp.fabs(epsm + n) < tol:
+        return n
     return None
 
-def _eps_to_n_half(eps: float, tol=1e-12):
+def _eps_to_n_pos_int(eps: float, tol=1e-12):
     epsm = mp.mpf(eps)
-    if mp.fabs(epsm + mp.mpf("0.5")) < tol: return 1
-    if mp.fabs(epsm + mp.mpf("1.5")) < tol: return 2
-    if mp.fabs(epsm + mp.mpf("2.5")) < tol: return 3
-    if mp.fabs(epsm + mp.mpf("3.5")) < tol: return 4
+    n = int(mp.nint(epsm))
+    if n >= 1 and mp.fabs(epsm - n) < tol:
+        return n
     return None
 
 def eps_to_n_int(eps):
     return _eps_to_n_int(eps)
 
-def eps_to_n_half(eps):
-    return _eps_to_n_half(eps)
-
-# ---------------- coefficients ----------------
-def alpha0(eps: float):
-    return (mp.pi ** 2) / (mp.sin(mp.pi * eps) ** 2)
-
-def alpha1(eps: float):
-    return - (mp.pi ** 2) / (mp.sin(mp.pi * eps) * mp.sin(2.0 * mp.pi * eps))
-
-def alpha2(eps: float):
-    return (2.0 ** (-2.0 * eps - 1.0)
-            * mp.sqrt(mp.pi)
-            * (1.0 / mp.sin(mp.pi * eps))
-            * mp.gamma(eps)
-            * mp.gamma(0.5 - eps))
-
-# ------------------------------------------------------
-# ---------------- general eps solutions ---------------
-# ------------------------------------------------------
-def I1_eps(x1: float, x2: float, eps: float, c: float, *, _alp0=None, _alp2=None):
-    w1, w2, w3, w4, w5 = _w_select(x1, x2, c, 1, 2, 3, 4, 5)
-
-    if _alp0 is None:
-        _alp0 = alpha0(eps)
-    if _alp2 is None:
-        _alp2 = alpha2(eps)
-
-    term1 = _alp0 * (w1 ** eps) * (w2 ** eps)
-
-    # 2F1(1, -2eps; 1-eps; wi / wj)
-    def _hg(z):
-        return mp.hyper([1.0, -2.0 * eps], [1.0 - eps], z)
-
-    term2 = _alp2 * (w5 ** (2.0 * eps)) * (_hg(w3 / w5) + _hg(w4 / w5))
-
-    return term1 - term2
-
-def I2_eps(x1: float, x2: float, eps: float, c: float, *, _alp1=None, _alp2=None):
-    w2, w3, w5 = _w_select(x1, x2, c, 2, 3, 5)
-
-    if _alp1 is None:
-        _alp1 = alpha1(eps)
-    if _alp2 is None:
-        _alp2 = alpha2(eps)
-
-    term1 = _alp1 * (w2 ** eps) * (w3 ** eps)
-
-    u1 = w3 / w2
-    u2 = w5 / w2
-    hg = mp.hyper([eps, 2.0 * eps], [1.0 + 2.0 * eps], u2)
-    term2 = _alp2 * (u1 ** eps) * (w5 ** (2.0 * eps)) * hg
-
-    return term1 + term2
-
-def I3_eps(x1: float, x2: float, eps: float, c: float, *, _alp1=None, _alp2=None):
-    w1, w4, w5 = _w_select(x1, x2, c, 1, 4, 5)
-
-    if _alp1 is None:
-        _alp1 = alpha1(eps)
-    if _alp2 is None:
-        _alp2 = alpha2(eps)
-
-    term1 = _alp1 * (w1 ** eps) * (w4 ** eps)
-
-    u1 = w4 / w1
-    u2 = w5 / w1
-    hg = mp.hyper([eps, 2.0 * eps], [1.0 + 2.0 * eps], u2)
-    term2 = _alp2 * (u1 ** eps) * (w5 ** (2.0 * eps)) * hg
-
-    return term1 + term2
-
-def I4_eps(x1: float, x2: float, eps: float, c: float, *, _alp2=None):
-    (w5,) = _w_select(x1, x2, c, 5)
-
-    if _alp2 is None:
-        _alp2 = alpha2(eps)
-
-    return 2.0 * _alp2 * (w5 ** (2.0 * eps))
+def eps_to_n_pos_int(eps):
+    return _eps_to_n_pos_int(eps)
 
 # -----------------------------------------
 # ---------------- eps = 0 ----------------
@@ -138,6 +61,46 @@ def I3_eps0(x1: float, x2: float, c: float):
 
 def I4_eps0(_x1: float, _x2: float, _c: float):
     return mp.mpf("1")
+
+# ------------------------------------------
+# ---------------- eps = +n ----------------
+# ------------------------------------------
+def _pos_int_branch_sum(w_main, w_alt, n: int):
+    coeff = mp.binomial(2 * n, n)
+    series = mp.fsum(
+        (
+            mp.binomial(2 * n - 1, n + m - 1) * (w_alt ** (n + m)) * (w_main ** (n - m))
+            - (mp.binomial(2 * n - 1, n - m - 1) if (n - m - 1) >= 0 else mp.mpf("0"))
+            * (w_main ** (n + m)) * (w_alt ** (n - m))
+        ) / m
+        for m in range(1, n + 1)
+    )
+    prefactor = ((-1) ** (n + 1)) * mp.mpf("0.5") * (w_main ** n) * (w_alt ** n)
+    log_term = mp.mpf("0.5") * (w_main ** n) * (w_alt ** n) * mp.log(w_alt / w_main)
+    return prefactor + log_term + series / coeff
+
+def I2_eps_pos_int(x1: float, x2: float, n: int, c: float):
+    w2, w3 = _w_select(x1, x2, c, 2, 3)
+
+    return _pos_int_branch_sum(w2, w3, n)
+
+def I3_eps_pos_int(x1: float, x2: float, n: int, c: float):
+    w1, w4 = _w_select(x1, x2, c, 1, 4)
+
+    return _pos_int_branch_sum(w1, w4, n)
+
+def I4_eps_pos_int(x1: float, x2: float, n: int, c: float):
+    (w5,) = _w_select(x1, x2, c, 5)
+
+    return (w5 ** (2 * n)) / (n * mp.binomial(2 * n, n))
+
+def I1_eps_pos_int(x1: float, x2: float, n: int, c: float):
+    w1, w2 = _w_select(x1, x2, c, 1, 2)
+    I2t = I2_eps_pos_int(x1, x2, n, c)
+    I3t = I3_eps_pos_int(x1, x2, n, c)
+    I4t = I4_eps_pos_int(x1, x2, n, c)
+
+    return (w1 ** n) * (w2 ** n) + I2t + I3t - I4t
 
 # ------------------------------------------
 # ---------------- eps = -n ----------------
@@ -183,126 +146,76 @@ def I4_eps_int(x1: float, x2: float, n: int, c: float):
 
     return mp.binomial(2*n, n) / (w5**(2*n))
 
-
-# ---------------- eps = -(2n-1)/2 ----------------
-def _odd_double_factorial(m: int):
-    # m must be odd positive
-    out = mp.mpf("1")
-    for k in range(1, m + 1, 2):
-        out *= k
-    return out
-
-def _Poly_half(n: int, a, b):
-    a = mp.mpf(a) if isinstance(a, (int, float)) else a
-    b = mp.mpf(b) if isinstance(b, (int, float)) else b
-
-    if n == 1:
-        return mp.mpf("1")
-    if n == 2:
-        return 3*(a**2) + 8*a*b - 3*(b**2)
-    if n == 3:
-        return 15*(a**4) + 70*(a**3)*b + 128*(a**2)*(b**2) - 70*a*(b**3) - 15*(b**4)
-    if n == 4:
-        return (105*(a**6) + 700*(a**5)*b + 1981*(a**4)*(b**2) + 3072*(a**3)*(b**3)
-                - 1981*(a**2)*(b**4) - 700*a*(b**5) - 105*(b**6))
-    raise ValueError("Half-integer branch supports n=(1,2,3,4) only.")
-
-def _eps_half_core(a, b, w5, n: int):
-    df = _odd_double_factorial(2 * n - 1)
-    pow_ab = a ** (n - 0.5) * b ** (n - 0.5)
-    term1 = (1 / pow_ab) * mp.atan(mp.sqrt(b / a))
-
-    poly = _Poly_half(n, a, b)
-    term2 = poly / (df * (pow_ab * w5 ** (2 * n - 1)))
-
-    return -2 * mp.pi * (term1 - term2)
-
-def I2_eps_half(x1: float, x2: float, n: int, c: float):
-    w2, w3, w5 = _w_select(x1, x2, c, 2, 3, 5)
-
-    return _eps_half_core(w2, w3, w5, n)
-
-def I3_eps_half(x1: float, x2: float, n: int, c: float):
-    w1, w4, w5 = _w_select(x1, x2, c, 1, 4, 5)
-
-    return _eps_half_core(w1, w4, w5, n)
-
-def I4_eps_half(x1: float, x2: float, n: int, c: float):
-    (w5,) = _w_select(x1, x2, c, 5)
-    coeff = (2**(4*n - 1)) * mp.pi / (n * mp.binomial(2*n, n))
-
-    return coeff / (w5**(2*n - 1))
-
-def I1_eps_half(x1: float, x2: float, n: int, c: float):
-    w1, w2, w3, w4, w5 = _w_select(x1, x2, c, 1, 2, 3, 4, 5)
-    I2t = I2_eps_half(x1, x2, n, c)
-    I3t = I3_eps_half(x1, x2, n, c)
-    I4t = I4_eps_half(x1, x2, n, c)
-
-    return (mp.pi**2) / (w1 ** (n - 0.5) * w2 ** (n - 0.5)) + I2t + I3t - I4t
-
 # ---------------- final solutions ----------------
 EPS_TOL = mp.mpf("1e-12")
 
-def I1_fin(x1: float, x2: float, eps: float, c: float, *, _alp0=None, _alp2=None):
+def _raise_unsupported_eps(eps):
+    raise ValueError(
+        "sol_chain.py currently supports only "
+        "eps=0, eps=+n, or eps=-n; "
+        f"got eps={eps}."
+    )
+
+
+def I1_fin(x1: float, x2: float, eps: float, c: float):
     eps = mp.mpf(eps)
     if mp.fabs(eps) < EPS_TOL:
         return I1_eps0(x1, x2, c)
+
+    n_pos_int = _eps_to_n_pos_int(eps)
+    if n_pos_int is not None:
+        return I1_eps_pos_int(x1, x2, n_pos_int, c)
 
     n_int = _eps_to_n_int(eps)
     if n_int is not None:
         return I1_eps_int(x1, x2, n_int, c)
 
-    n_half = _eps_to_n_half(eps)
-    if n_half is not None:
-        return I1_eps_half(x1, x2, n_half, c)
-
-    return I1_eps(x1, x2, eps, c, _alp0=_alp0, _alp2=_alp2)
+    _raise_unsupported_eps(eps)
 
 
-def I2_fin(x1: float, x2: float, eps: float, c: float, *, _alp1=None, _alp2=None):
+def I2_fin(x1: float, x2: float, eps: float, c: float):
     eps = mp.mpf(eps)
     if mp.fabs(eps) < EPS_TOL:
         return I2_eps0(x1, x2, c)
+
+    n_pos_int = _eps_to_n_pos_int(eps)
+    if n_pos_int is not None:
+        return I2_eps_pos_int(x1, x2, n_pos_int, c)
 
     n_int = _eps_to_n_int(eps)
     if n_int is not None:
         return I2_eps_int(x1, x2, n_int, c)
 
-    n_half = _eps_to_n_half(eps)
-    if n_half is not None:
-        return I2_eps_half(x1, x2, n_half, c)
-
-    return I2_eps(x1, x2, eps, c, _alp1=_alp1, _alp2=_alp2)
+    _raise_unsupported_eps(eps)
 
 
-def I3_fin(x1: float, x2: float, eps: float, c: float, *, _alp1=None, _alp2=None):
+def I3_fin(x1: float, x2: float, eps: float, c: float):
     eps = mp.mpf(eps)
     if mp.fabs(eps) < EPS_TOL:
         return I3_eps0(x1, x2, c)
+
+    n_pos_int = _eps_to_n_pos_int(eps)
+    if n_pos_int is not None:
+        return I3_eps_pos_int(x1, x2, n_pos_int, c)
 
     n_int = _eps_to_n_int(eps)
     if n_int is not None:
         return I3_eps_int(x1, x2, n_int, c)
 
-    n_half = _eps_to_n_half(eps)
-    if n_half is not None:
-        return I3_eps_half(x1, x2, n_half, c)
-
-    return I3_eps(x1, x2, eps, c, _alp1=_alp1, _alp2=_alp2)
+    _raise_unsupported_eps(eps)
 
 
-def I4_fin(x1: float, x2: float, eps: float, c: float, *, _alp2=None):
+def I4_fin(x1: float, x2: float, eps: float, c: float):
     eps = mp.mpf(eps)
     if mp.fabs(eps) < EPS_TOL:
         return I4_eps0(x1, x2, c)
+
+    n_pos_int = _eps_to_n_pos_int(eps)
+    if n_pos_int is not None:
+        return I4_eps_pos_int(x1, x2, n_pos_int, c)
 
     n_int = _eps_to_n_int(eps)
     if n_int is not None:
         return I4_eps_int(x1, x2, n_int, c)
 
-    n_half = _eps_to_n_half(eps)
-    if n_half is not None:
-        return I4_eps_half(x1, x2, n_half, c)
-
-    return I4_eps(x1, x2, eps, c, _alp2=_alp2)
+    _raise_unsupported_eps(eps)
