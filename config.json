@@ -2,14 +2,14 @@
   "activation_f": "gelu",
   "device": "auto",
   "scheduler_type": "cos",
-  "cosine_min_lr": 1e-8,
+  "cosine_min_lr": 1e-08,
   "hidden_size": 256,
   "n_hidden_layers": 4,
 
   "n_coll": 50000,
   "n_coll_1loop": 100000,
   "n_coll_2loop": 150000,
-  "eps_global": -3.0,
+  "eps_global": -2.0,
 
   "phase1_output_part": "Re",
   "n_basis": 4,
@@ -22,64 +22,68 @@
   "phase2_output_part": "Re",
   "n_basis_1loop": 10,
   "cy_1loop": 5.0,
-  "x1_min_1loop": 30.0, "x1_max_1loop": 40.0,
-  "x2_min_1loop": 30.0, "x2_max_1loop": 40.0,
-  "y1_min_1loop": 15.0, "y1_max_1loop": 20.0,
+  "x1_min_1loop": 30.0,
+  "x1_max_1loop": 40.0,
+  "x2_min_1loop": 30.0,
+  "x2_max_1loop": 40.0,
+  "y1_min_1loop": 15.0,
+  "y1_max_1loop": 20.0,
 
   "phase3_output_part": "Re",
   "n_basis_2loop": 22,
   "cy_2loop": 5.0,
-  "x1_min_2loop": 50.0, "x1_max_2loop": 60.0,
-  "x2_min_2loop": 50.0, "x2_max_2loop": 60.0,
-  "y1_min_2loop": 20.0, "y1_max_2loop": 25.0,
-  "y2_min_2loop": 10.0, "y2_max_2loop": 15.0,
+  "x1_min_2loop": 50.0,
+  "x1_max_2loop": 60.0,
+  "x2_min_2loop": 50.0,
+  "x2_max_2loop": 60.0,
+  "y1_min_2loop": 20.0,
+  "y1_max_2loop": 25.0,
+  "y2_min_2loop": 10.0,
+  "y2_max_2loop": 15.0,
 
   "coll_bc": {
     "target_total": 5000,
-    "n_bc_edge": 200,
-    "n_corner_each": 200
+    "n_bc_edge": 450,
+    "n_corner_each": 450
   },
   "coll_bc_1loop": {
     "target_total_bc": 10000,
-    "n_bc_edge": 200,
-    "n_face_pts": 400,
+    "n_bc_edge": 300,
+    "n_face_pts": 350,
     "n_corner_extra": 200,
-    "bc_abs_cap": 1e8
+    "bc_abs_cap": 100000000.0
   },
   "coll_bc_2loop": {
-    "target_total_bc": 15000,
-    "n_bc_edge": 120,
-    "n_face_pts": 160,
+    "target_total_bc": 17000,
+    "n_bc_edge": 200,
+    "n_face_pts": 150,
     "n_cell_pts": 200,
-    "n_corner_extra": 100,
-    "bc_abs_cap": 1e8
+    "n_corner_extra": 80,
+    "bc_abs_cap": 100000000.0
   },
-
   "phase1_epochs": 6000,
   "warmup_epochs_p1": 600,
-  "learning_rate_p1": 1e-3,
-
+  "learning_rate_p1": 0.001,
   "phase2_epochs": 8000,
   "warmup_epochs_p2": 800,
-  "learning_rate_p2": 1e-3,
-
+  "learning_rate_p2": 0.001,
   "phase3_epochs": 10000,
   "warmup_epochs_p3": 1000,
-  "learning_rate_p3": 1e-3,
+  "learning_rate_p3": 0.001,
 
   "use_local_config": false,
 
-  "enable_phase2": false,
-  "enable_phase3": true,
+  "enable_phase2": true,
+  "enable_phase3": false,
 
-  "use_clip_gn_phase2": false,
+  "use_clip_gn_phase2": true,
   "grad_clip_max_norm": 200.0,
 
   "use_clip_gn_phase3": false,
   "grad_clip_max_norm_phase3": 200.0,
 
-  "run_phase2_only": false,
-  "run_phase3_only": true,
+  "run_phase2_only": true,
+  "run_phase3_only": false,
 
   "normalized_bc": true,
 
@@ -87,29 +91,27 @@
   "use_results_gpu_models": false,
 
   "train_two_phase_only": false,
-
   "solution_scale_mode": "auto",
-  "solution_scale_p1": 1e6,
-  "solution_scale_p2": 1e6,
-  "solution_scale_p3": 1e6,
-  "solution_scale_ref_mean": 1e-1,
-  "solution_scale_max": 1e12,
+  "solution_scale_p1": 1000000.0,
+  "solution_scale_p2": 1000000.0,
+  "solution_scale_p3": 1000000.0,
+  "solution_scale_ref_mean": 0.1,
+  "solution_scale_max": 1000000000000.0,
+  "solution_scale_max_p3": 1e16,
   "bc_loss_use_normalized": true,
-  "bc_loss_scale_floor": 1e-4,
+  "bc_loss_scale_floor": 0.0001,
   "bc_loss_min_scale_ratio": 1.0,
   "bc_loss_abs_mse_weight": 0.05,
-
   "print_every": 200,
   "plot_vector_l2_hist": true,
 
-  "postcalc_num_workers": 18,
+  "postcalc_num_workers": 16,
   "postcalc_chunk_size": 2000,
   "postcalc_parallel_min_points": 5000,
 
   "save_phase_artifacts": true,
   "save_eval_bundle": true,
   "reuse_eval_bundle": false,
-
   "phase1_model_load_path": "",
   "phase1_history_load_path": "",
   "phase1_eval_bundle_load_path": "",
@@ -120,6 +122,6 @@
   "phase3_history_load_path": "",
   "phase3_eval_bundle_load_path": "",
 
-  "lambda1": 1.0,
+  "lambda1": 120.0,
   "lambda2": 1.0
 }

@@ -2,6 +2,7 @@ import json
 import os
 import time
 import pickle
+import inspect
 import numpy as np
 import torch
 import warnings
@@ -22,6 +23,7 @@ from plot_tools.plot_losses import (
     get_results_root_name,
 )
 from plot_tools.post_train_check import post_train_check
+from two_site_chain.sol_chain import eps_to_n_pos_int
 from two_site_chain.coll_bc import (
     build_inputs_and_boundary,
     compute_function_target_from_xcoll,
@@ -51,15 +53,18 @@ class Config:
 
 def _classify_eps_global(eps, eps0_tol=1e-12, tol=1e-6):
     epsf = float(eps)
-    int_map = {-1.0: 1, -2.0: 2, -3.0: 3}
     half_map = {-0.5: 1, -1.5: 2, -2.5: 3, -3.5: 4}
 
     if abs(epsf) < eps0_tol:
         return "eps0", "I*_eps0", "a_hat (eps=0 special CDE)"
 
-    for v, n in int_map.items():
-        if abs(epsf - v) < tol:
-            return "neg-int", f"I*_eps_int (n={n})", "eps * A"
+    n_pos_int = eps_to_n_pos_int(epsf)
+    if n_pos_int is not None:
+        return "pos-int", f"I*_eps_pos_int (n={n_pos_int})", "eps * A"
+
+    n_int = int(round(-epsf))
+    if n_int >= 1 and abs(epsf + n_int) < tol:
+        return "neg-int", f"I*_eps_int (n={n_int})", "eps * A"
 
     for v, n in half_map.items():
         if abs(epsf - v) < tol:
@@ -69,7 +74,11 @@ def _classify_eps_global(eps, eps0_tol=1e-12, tol=1e-6):
 
 
 def _make_eps_tag(eps) -> str:
-    return f"{float(eps):.6g}".replace(".", "_").replace("-", "m")
+    epsf = float(eps)
+    if abs(epsf) < 1e-12:
+        return "0"
+    mag = f"{abs(epsf):.6g}".replace(".", "_")
+    return f"m{mag}" if epsf < 0 else f"p{mag}"
 
 
 def _to_bool(value, default=True):
@@ -140,6 +149,34 @@ def _slice_phase1_target_by_part(
         f"{tensor_name} has incompatible dim={dim} for output_part='{part}' and n_basis={nb}"
     )
 
+def _get_nested_save_dir_compat(
+    save_dir: str,
+    cy: float,
+    *,
+    phase: int,
+    phase_tag: str = None,
+    create_dir: bool = True,
+):
+    sig = inspect.signature(get_nested_save_dir)
+    if "create_dir" in sig.parameters:
+        return get_nested_save_dir(
+            save_dir,
+            cy,
+            phase=phase,
+            phase_tag=phase_tag,
+            create_dir=create_dir,
+        )
+
+    abs_dir, short_dir = get_nested_save_dir(
+        save_dir,
+        cy,
+        phase=phase,
+        phase_tag=phase_tag,
+    )
+    if create_dir:
+        os.makedirs(abs_dir, exist_ok=True)
+    return abs_dir, short_dir
+
 
 def _open_phase_log_writer(
     phase: int,
@@ -149,11 +186,12 @@ def _open_phase_log_writer(
     output_part_tag: str = None,
     log_suffix: str = None,
 ):
-    losses_dir_abs, losses_dir_short = get_nested_save_dir(
+    losses_dir_abs, losses_dir_short = _get_nested_save_dir_compat(
         "1_losses",
         cy,
         phase=phase,
         phase_tag=phase_tag,
+        create_dir=True,
     )
     phase_root_abs = os.path.dirname(losses_dir_abs)
     phase_root_short = os.path.dirname(losses_dir_short)
@@ -192,13 +230,28 @@ def _auto_solution_scale_from_bc(
     max_scale: float,
     min_scale: float = 1.0,
 ):
+    if int(bc_target.numel()) == 0:
+        raise ValueError("auto solution scale received an empty bc_target tensor.")
+
     bc_mean_abs = float(torch.mean(torch.abs(bc_target)).item())
+    if not np.isfinite(bc_mean_abs):
+        raise ValueError(
+            "auto solution scale received a non-finite BC mean abs. "
+            "Check boundary target construction and filtering."
+        )
     if bc_mean_abs <= 0.0:
-        return float(min_scale), bc_mean_abs
+        return float(min_scale), bc_mean_abs, 0.0, False, True
 
     raw_scale = float(ref_mean_abs) / bc_mean_abs
+    if not np.isfinite(raw_scale):
+        raise ValueError(
+            "auto solution scale computed a non-finite raw scale. "
+            "Check BC target magnitude and solution_scale settings."
+        )
     used = max(float(min_scale), min(float(max_scale), raw_scale))
-    return float(used), bc_mean_abs
+    capped = bool(raw_scale > float(max_scale))
+    floored = bool(raw_scale < float(min_scale))
+    return float(used), bc_mean_abs, float(raw_scale), capped, floored
 
 
 def _format_elapsed(elapsed_sec: float) -> str:
@@ -248,12 +301,14 @@ def _phase_artifact_paths(
     eps_global,
     phase_tag: str = None,
     output_part_tag: str = None,
+    create_dirs: bool = False,
 ):
-    save_abs, save_short = get_nested_save_dir(
+    save_abs, save_short = _get_nested_save_dir_compat(
         "0_models",
         cy,
         phase=phase,
         phase_tag=phase_tag,
+        create_dir=bool(create_dirs),
     )
     eps_tag = _make_eps_tag(eps_global)
     suffix = ""
@@ -277,12 +332,14 @@ def _phase_eval_bundle_paths(
     eps_global,
     phase_tag: str = None,
     output_part_tag: str = None,
+    create_dirs: bool = False,
 ):
-    save_abs, save_short = get_nested_save_dir(
+    save_abs, save_short = _get_nested_save_dir_compat(
         "0_models",
         cy,
         phase=phase,
         phase_tag=phase_tag,
+        create_dir=bool(create_dirs),
     )
     eps_tag = _make_eps_tag(eps_global)
     suffix = ""
@@ -401,6 +458,7 @@ def _save_phase_artifacts(
         eps_global=eps_global,
         phase_tag=phase_tag,
         output_part_tag=output_part_tag,
+        create_dirs=True,
     )
     ckpt = {
         "phase": int(phase),
@@ -440,6 +498,7 @@ def _save_eval_bundle(
         eps_global=eps_global,
         phase_tag=phase_tag,
         output_part_tag=output_part_tag,
+        create_dirs=True,
     )
     payload = {
         "phase": int(phase),
@@ -507,6 +566,15 @@ def main():
     train_two_phase_only = _to_bool(getattr(cfg, "train_two_phase_only", False), default=False)
     run_phase2_only = _to_bool(getattr(cfg, "run_phase2_only", False), default=False)
     run_phase3_only = _to_bool(getattr(cfg, "run_phase3_only", False), default=False)
+    eps_pos_int_n = eps_to_n_pos_int(cfg.eps_global)
+    if eps_pos_int_n is not None:
+        if run_phase2_only or enable_phase2:
+            print(
+                f"[Warn] eps_global={cfg.eps_global} is a positive integer (n={eps_pos_int_n}); "
+                "Phase2 analytic targets are not implemented yet. Disable Phase2 and keep Phase1/Phase3 available."
+            )
+        enable_phase2 = False
+        run_phase2_only = False
 
     solution_scale_mode = str(getattr(cfg, "solution_scale_mode", "auto")).strip().lower()
     if solution_scale_mode not in {"auto", "manual"}:
@@ -517,6 +585,19 @@ def main():
     p3_solution_scale = float(getattr(cfg, "solution_scale_p3", p2_solution_scale))
     solution_scale_ref_mean = float(getattr(cfg, "solution_scale_ref_mean", 1e-1))
     solution_scale_max = float(getattr(cfg, "solution_scale_max", 1e12))
+    solution_scale_min = float(getattr(cfg, "solution_scale_min", 1e-30))
+    p1_solution_scale_max = float(getattr(cfg, "solution_scale_max_p1", solution_scale_max))
+    p2_solution_scale_max = float(getattr(cfg, "solution_scale_max_p2", solution_scale_max))
+    p3_solution_scale_max = float(getattr(cfg, "solution_scale_max_p3", solution_scale_max))
+    p1_solution_scale_min = float(getattr(cfg, "solution_scale_min_p1", solution_scale_min))
+    p2_solution_scale_min = float(getattr(cfg, "solution_scale_min_p2", solution_scale_min))
+    p3_solution_scale_min = float(getattr(cfg, "solution_scale_min_p3", solution_scale_min))
+    if p1_solution_scale_min <= 0.0:
+        p1_solution_scale_min = 1e-30
+    if p2_solution_scale_min <= 0.0:
+        p2_solution_scale_min = 1e-30
+    if p3_solution_scale_min <= 0.0:
+        p3_solution_scale_min = 1e-30
     bc_loss_use_normalized = _to_bool(getattr(cfg, "bc_loss_use_normalized", True), default=True)
     bc_loss_scale_floor = float(getattr(cfg, "bc_loss_scale_floor", 1e-4))
     bc_loss_min_scale_ratio = float(getattr(cfg, "bc_loss_min_scale_ratio", 1.0))
@@ -770,6 +851,8 @@ def main():
     print(f"[Mode] eps category: {eps_kind}")
     print(f"[Mode] analytic branch: {sol_branch}")
     print(f"[Mode] CDE form: {cde_form}")
+    if eps_pos_int_n is not None:
+        print(f"[Mode] positive-integer eps support: Phase1/Phase3 enabled, Phase2 disabled (n={eps_pos_int_n})")
     print(f"[Mode] phase1 output part: {p1_output_part_label}")
     print(f"[Mode] phase2 output part: {p2_output_part_label}")
     print(f"[Mode] phase3 output part: {p3_output_part_label}")
@@ -810,13 +893,18 @@ def main():
         f"abs_mse_weight={bc_loss_abs_mse_weight:g}"
     )
     print(
+        "[Mode] loss weights: "
+        f"manual, lambda1={float(cfg.lambda1):g}, lambda2={float(cfg.lambda2):g}"
+    )
+    print(
         "[Mode] solution scaling: "
         f"mode={solution_scale_mode}, "
         f"P1={p1_solution_scale:g}, "
         f"P2={p2_solution_scale:g}, "
         f"P3={p3_solution_scale:g}, "
         f"ref_mean={solution_scale_ref_mean:g}, "
-        f"max={solution_scale_max:g}"
+        f"min(P1/P2/P3)=({p1_solution_scale_min:g}/{p2_solution_scale_min:g}/{p3_solution_scale_min:g}), "
+        f"max(P1/P2/P3)=({p1_solution_scale_max:g}/{p2_solution_scale_max:g}/{p3_solution_scale_max:g})"
     )
     print(f"[Mode] plot vector-L2 hist: {plot_vector_l2_hist}")
     print(
@@ -931,15 +1019,28 @@ def main():
         )
 
         if solution_scale_mode == "auto":
-            p1_solution_scale, p1_bc_mean_abs = _auto_solution_scale_from_bc(
+            (
+                p1_solution_scale,
+                p1_bc_mean_abs,
+                p1_raw_solution_scale,
+                p1_scale_capped,
+                p1_scale_floored,
+            ) = _auto_solution_scale_from_bc(
                 bc_target,
                 ref_mean_abs=solution_scale_ref_mean,
-                max_scale=solution_scale_max,
-                min_scale=1.0,
+                max_scale=p1_solution_scale_max,
+                min_scale=p1_solution_scale_min,
             )
+            p1_scale_flags = []
+            if p1_scale_capped:
+                p1_scale_flags.append(f"capped@{p1_solution_scale_max:.3e}")
+            if p1_scale_floored:
+                p1_scale_flags.append(f"floored@{p1_solution_scale_min:.3e}")
+            p1_scale_flag_text = f" ({', '.join(p1_scale_flags)})" if p1_scale_flags else ""
             print(
                 f"[P1] auto solution scale from BC mean abs={p1_bc_mean_abs:.3e} "
-                f"-> scale={p1_solution_scale:.3e}"
+                f"-> raw={p1_raw_solution_scale:.3e}, used={p1_solution_scale:.3e}"
+                f"{p1_scale_flag_text}"
             )
         bc_target_train = bc_target * p1_solution_scale
 
@@ -1002,6 +1103,7 @@ def main():
     hist_tot = None
     hist_cde = None
     hist_bc = None
+    p1_train_info = {}
     if p1_model_load_path is not None:
         p1_load_header = "------ Phase 1: Load 2-Site Chain checkpoint ------"
         print(f"\n{p1_load_header}")
@@ -1071,6 +1173,7 @@ def main():
             hist_tot,
             hist_cde,
             hist_bc,
+            p1_train_info,
         ) = train_model_fixed_eps(
             model=model_base,
             a_builder=a_builder_fixed,
@@ -1107,6 +1210,7 @@ def main():
                     "in_dim": int(x_coll.shape[1]),
                     "n_basis": int(cfg.n_basis),
                     "output_part": p1_output_part,
+                    **p1_train_info,
                 },
                 phase_tag=p1_phase_tag,
                 output_part_tag=p1_output_part_tag,
@@ -1134,6 +1238,7 @@ def main():
                 "in_dim": int(x_coll.shape[1]),
                 "n_basis": int(cfg.n_basis),
                 "output_part": p1_output_part,
+                **p1_train_info,
             },
             phase_tag=p1_phase_tag,
             output_part_tag=p1_output_part_tag,
@@ -1284,15 +1389,28 @@ def main():
             tensor_name="P2 bc_target",
         )
         if solution_scale_mode == "auto":
-            p2_solution_scale, p2_bc_mean_abs = _auto_solution_scale_from_bc(
+            (
+                p2_solution_scale,
+                p2_bc_mean_abs,
+                p2_raw_solution_scale,
+                p2_scale_capped,
+                p2_scale_floored,
+            ) = _auto_solution_scale_from_bc(
                 bc_target_1loop,
                 ref_mean_abs=solution_scale_ref_mean,
-                max_scale=solution_scale_max,
-                min_scale=1.0,
+                max_scale=p2_solution_scale_max,
+                min_scale=p2_solution_scale_min,
             )
+            p2_scale_flags = []
+            if p2_scale_capped:
+                p2_scale_flags.append(f"capped@{p2_solution_scale_max:.3e}")
+            if p2_scale_floored:
+                p2_scale_flags.append(f"floored@{p2_solution_scale_min:.3e}")
+            p2_scale_flag_text = f" ({', '.join(p2_scale_flags)})" if p2_scale_flags else ""
             print(
                 f"[P2] auto solution scale from BC mean abs={p2_bc_mean_abs:.3e} "
-                f"-> scale={p2_solution_scale:.3e}"
+                f"-> raw={p2_raw_solution_scale:.3e}, used={p2_solution_scale:.3e}"
+                f"{p2_scale_flag_text}"
             )
         bc_target_1loop_train = bc_target_1loop * p2_solution_scale
     
@@ -1370,6 +1488,7 @@ def main():
         hist_tot_p2 = None
         hist_cde_p2 = None
         hist_bc_p2 = None
+        p2_train_info = {}
         if p2_model_load_path is not None:
             print("\n------ Phase 2: Load 1-loop checkpoint ------")
             p2_meta = _load_model_checkpoint(model_p2, p2_model_load_path, device)
@@ -1422,6 +1541,7 @@ def main():
                 hist_tot_p2,
                 hist_cde_p2,
                 hist_bc_p2,
+                p2_train_info,
             ) = train_model_fixed_eps(
                 model=model_p2,
                 a_builder=a_builder_1loop,
@@ -1460,6 +1580,7 @@ def main():
                         "n_basis": int(cfg.n_basis_1loop),
                         "output_part": p2_output_part,
                         "phase1_model_ref": p1_artifacts["model_short"],
+                        **p2_train_info,
                     },
                     phase_tag=p2_phase_tag,
                     output_part_tag=p2_output_part_tag,
@@ -1483,6 +1604,7 @@ def main():
                     "n_basis": int(cfg.n_basis_1loop),
                     "output_part": p2_output_part,
                     "phase1_model_ref": p1_artifacts["model_short"],
+                    **p2_train_info,
                 },
                 phase_tag=p2_phase_tag,
                 output_part_tag=p2_output_part_tag,
@@ -1624,15 +1746,28 @@ def main():
             tensor_name="P3 bc_target",
         )
         if solution_scale_mode == "auto":
-            p3_solution_scale, p3_bc_mean_abs = _auto_solution_scale_from_bc(
+            (
+                p3_solution_scale,
+                p3_bc_mean_abs,
+                p3_raw_solution_scale,
+                p3_scale_capped,
+                p3_scale_floored,
+            ) = _auto_solution_scale_from_bc(
                 bc_target_2loop,
                 ref_mean_abs=solution_scale_ref_mean,
-                max_scale=solution_scale_max,
-                min_scale=1.0,
+                max_scale=p3_solution_scale_max,
+                min_scale=p3_solution_scale_min,
             )
+            p3_scale_flags = []
+            if p3_scale_capped:
+                p3_scale_flags.append(f"capped@{p3_solution_scale_max:.3e}")
+            if p3_scale_floored:
+                p3_scale_flags.append(f"floored@{p3_solution_scale_min:.3e}")
+            p3_scale_flag_text = f" ({', '.join(p3_scale_flags)})" if p3_scale_flags else ""
             print(
                 f"[P3] auto solution scale from BC mean abs={p3_bc_mean_abs:.3e} "
-                f"-> scale={p3_solution_scale:.3e}"
+                f"-> raw={p3_raw_solution_scale:.3e}, used={p3_solution_scale:.3e}"
+                f"{p3_scale_flag_text}"
             )
         bc_target_2loop_train = bc_target_2loop * p3_solution_scale
 
@@ -1794,6 +1929,7 @@ def main():
         hist_tot_p3 = None
         hist_cde_p3 = None
         hist_bc_p3 = None
+        p3_train_info = {}
         if p3_model_load_path is not None:
             print("\n------ Phase 3: Load 2-loop checkpoint ------")
             p3_meta = _load_model_checkpoint(model_p3, p3_model_load_path, device)
@@ -1846,6 +1982,7 @@ def main():
                 hist_tot_p3,
                 hist_cde_p3,
                 hist_bc_p3,
+                p3_train_info,
             ) = train_model_fixed_eps(
                 model=model_p3,
                 a_builder=a_builder_2loop,
@@ -1884,6 +2021,7 @@ def main():
                         "n_basis": int(n_basis_2loop),
                         "output_part": p3_output_part,
                         "phase1_model_ref": p1_artifacts["model_short"],
+                        **p3_train_info,
                     },
                     phase_tag=p3_phase_tag,
                     output_part_tag=p3_output_part_tag,
@@ -1913,6 +2051,7 @@ def main():
                     "n_basis": int(n_basis_2loop),
                     "output_part": p3_output_part,
                     "phase1_model_ref": p1_artifacts["model_short"],
+                    **p3_train_info,
                 },
                 phase_tag=p3_phase_tag,
                 output_part_tag=p3_output_part_tag,
