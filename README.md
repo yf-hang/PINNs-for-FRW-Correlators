@@ -16,9 +16,6 @@ The project is organized as a three-phase hierarchy:
 - `tl_two_site_bubble/`: Phase-2 transfer-learning setup
 - `tl_two_site_sunset/`: Phase-3 transfer-learning setup
 - `plot_tools/`: plotting and post-training diagnostic utilities
-- `FinalResults/`: merged figures, cached diagnostics, and post-processing scripts
-- `ANote/`: manuscript drafts and LaTeX summaries
-- `CHTC/`: batch and high-throughput computing helpers
 
 ## Main Features
 
@@ -40,10 +37,7 @@ The project is organized as a three-phase hierarchy:
 python main.py
 ```
 
-3. Use the scripts in `FinalResults/` to merge and visualize diagnostics.
-
 ## Notes
 
 - The current production workflow is configuration-driven rather than packaged as a pip module.
 - This repository is intended as research code, so some paths and runtime options are tuned for local or batch environments.
-- A script-specific usage guide for the result-merging tools is available in `FinalResults/README.md`.
