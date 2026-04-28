@@ -8,6 +8,8 @@ The project is organized as a three-phase hierarchy:
 - `Phase 1`: one-loop bubble, trained by transfer learning from matched Phase-0 checkpoints
 - `Phase 2`: two-loop sunset, also initialized from matched Phase-0 checkpoints
 
+Priority note. The formulation implemented in this codebase originate from [arXiv:2410.17192](https://arxiv.org/abs/2410.17192), where the CDEs for the relevant two-site loop level cosmological wavefunction integrals were first derived and analyzed. We ask that papers using, discussing, or extending this formulation cite [arXiv:2410.17192](https://arxiv.org/abs/2410.17192) as the original work.
+ 
 ## What This Repository Contains
 
 - `main.py`: main training entry point for fixed-`epsilon` runs
