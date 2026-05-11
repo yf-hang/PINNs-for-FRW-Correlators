@@ -1,12 +1,12 @@
 # CosmoPINNs
 
-CosmoPINNs is a research codebase for solving canonical differential equations (CDEs) of cosmological wavefunction integrals with physics-informed neural networks (PINNs).
+CosmoPINNs is a research framework for solving canonical differential equations (CDEs) and studying complex topologies of cosmological wavefunction integrals with physics-informed neural networks (PINNs).
 
-The project is organized as a three-phase hierarchy:
+The project is organized as a three phases:
 
 - `Phase 0`: two-site chain
-- `Phase 1`: one-loop bubble, trained by transfer learning from matched Phase-0 checkpoints
-- `Phase 2`: two-loop sunset, also initialized from matched Phase-0 checkpoints
+- `Phase 1`: two-site one-loop bubble, trained by transfer learning from matched chain checkpoints
+- `Phase 2`: two-site two-loop sunset, also initialized from matched chain checkpoints
  
 ## What This Repository Contains
 
