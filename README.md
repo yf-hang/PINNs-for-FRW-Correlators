@@ -51,8 +51,8 @@ The benchmark values of $\varepsilon$ are:
 | 1 | $\varepsilon = \{0, -1, -2, -3\}$ |
 | 2 | $\varepsilon = \{0, -1, -4, +5\}$ |
 
-Here $\varepsilon = 0$ is the dS benchmark and $\varepsilon = -1$ is the flat-space benchmark.
-The remaining values correspond to the RD/MD transfer benchmarks used for the
+Here $\varepsilon = 0$ and $\varepsilon = -1$ are corresponding to the de Sitter and flat-space backgrounds.
+The remaining values correspond to the radiation- and matter- dominated points used for the
 one- and two-loop systems.
 
 ## Repository Layout
@@ -61,7 +61,6 @@ one- and two-loop systems.
 .
 |-- main.py                         # Main configuration-driven training entry point
 |-- config.json                     # Default production/run configuration
-|-- config_local_test.json          # Smaller or local-test configuration
 |-- lib/
 |   |-- models.py                   # PINN and transfer-PINN modules
 |   |-- loss.py                     # CDE residual and boundary losses
@@ -70,23 +69,8 @@ one- and two-loop systems.
 |-- tl_two_site_bubble/             # Phase-2 one-loop transfer target
 |-- tl_two_site_sunset/             # Phase-3 two-loop transfer target
 |-- plot_tools/                     # Per-run plotting and post-training checks
-|-- FinalResults/                   # Merged figures and result post-processing
 |-- results/                        # Generated checkpoints, logs, plots, caches
 ```
-
-## Installation
-
-This is a research repository rather than an installable Python package. Run
-commands from the repository root.
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install torch numpy matplotlib mpmath
-```
-
-For CUDA runs, install the PyTorch build that matches your CUDA driver before
-running the training scripts.
 
 ## Running Training
 
@@ -106,7 +90,6 @@ Important configuration fields:
 | `run_phase2_only`, `run_phase3_only` | skip Phase-1 training and load an existing Phase-1 checkpoint |
 | `phase*_output_part` | `Re`, `Im`, or `Both`; manuscript runs use real-sector training |
 | `lambda1`, `lambda2` | CDE and boundary loss weights |
-| `reuse_saved_models`, `reuse_eval_bundle` | reuse saved artifacts when available |
 | `phase*_model_load_path` | explicit checkpoint path for transfer or evaluation |
 
 If `use_local_config` is set to `true` in `config.json`, `main.py` loads
@@ -134,47 +117,6 @@ or use the analogous `run_phase3_only` / `enable_phase3` settings for Phase 3.
 If `reuse_saved_models` is true and a matching Phase-1 checkpoint exists in the
 standard output location, `main.py` can infer the checkpoint path automatically.
 
-## Batch Utilities
-
-The batch runners modify `config.json`, launch `main.py`, and restore the
-original configuration unless `--keep-config` is used.
-
-Preview a Phase-2 $\lambda_1$ scan:
-
-```bash
-python run_eps_global_batch.py --dry-run --python /path/to/python
-```
-
-Preview selected Phase-3 runs:
-
-```bash
-python run_lambda1_batch.py --dry-run --python /path/to/python
-```
-
-The default interpreter paths in these scripts are local machine paths, so pass
-`--python` on a new system.
-
-## Post-Processing
-
-The `FinalResults/` scripts merge training histories and recompute diagnostics:
-
-```bash
-python FinalResults/merge_loss.py
-python FinalResults/merge_L12.py --device auto
-python FinalResults/merge_log.py
-python FinalResults/merge_cos.py
-```
-
-See `FinalResults/README.md` for script-specific arguments and examples.
-
-The main diagnostics are:
-
-- total, CDE, and boundary loss histories,
-- relative $\mathcal{L}_1$ and $\mathcal{L}_2$ norm-error distributions,
-- log-ratio amplitude mismatch,
-- cosine similarity $\mathcal{C}$ between predicted and analytic MI vectors.
-
-Figures are stored in `FinalResults/`.
 
 ## Notes
 
