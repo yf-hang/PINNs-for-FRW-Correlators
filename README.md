@@ -72,8 +72,6 @@ one- and two-loop systems.
 |-- plot_tools/                     # Per-run plotting and post-training checks
 |-- FinalResults/                   # Merged figures and result post-processing
 |-- results/                        # Generated checkpoints, logs, plots, caches
-|-- run_eps_global_batch.py         # Batch runner for parameter scans
-`-- run_lambda1_batch.py            # Batch runner for selected Phase-3 scans
 ```
 
 ## Installation
@@ -176,23 +174,7 @@ The main diagnostics are:
 - log-ratio amplitude mismatch,
 - cosine similarity $\mathcal{C}$ between predicted and analytic MI vectors.
 
-Representative merged figures are stored in `FinalResults/FinalResults_html_images/`.
-
-## Numerical Results
-
-The manuscript results show that the two-site chain is learned accurately across
-the benchmark values of $\varepsilon$. The final losses range from about
-`1.6e-7` to `1.3e-5`, while the median $\mathcal{L}_1$ and $\mathcal{L}_2$
-diagnostics remain below the percent level.
-
-For the loop-level transfer targets, the dS and flat benchmarks are the best
-controlled. RD/MD points are harder, especially at two loops, where the main
-loss of accuracy appears in the norm-based $\mathcal{L}_1$ and
-$\mathcal{L}_2$ diagnostics and in the broadening of their tails. The cosine
-similarity $\mathcal{C}$ remains close to one across the reported scans,
-indicating that the transferred models retain the overall functional direction
-of the analytic master-integral vector even when component-wise normalization
-errors grow.
+Figures are stored in `FinalResults/`.
 
 ## Notes
 
