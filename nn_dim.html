@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NN Dimension Scaling</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8fb;
+      --panel: #ffffff;
+      --text: #18202f;
+      --muted: #667085;
+      --border: #d7dce5;
+      --grid: #e7eaf0;
+      --input: #2f6fdd;
+      --output: #c33d2e;
+      --hidden: #23845d;
+      --shadow: 0 10px 30px rgba(20, 32, 52, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+
+    main {
+      width: min(1180px, calc(100vw - 32px));
+      margin: 28px auto 40px;
+    }
+
+    header {
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: clamp(1.5rem, 2.5vw, 2.3rem);
+      font-weight: 750;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      max-width: 820px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.98rem;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .controls {
+      padding: 18px;
+      position: sticky;
+      top: 18px;
+    }
+
+    .control {
+      margin-bottom: 18px;
+    }
+
+    .control:last-child {
+      margin-bottom: 0;
+    }
+
+    label {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+      font-weight: 650;
+      font-size: 0.94rem;
+    }
+
+    .value {
+      min-width: 48px;
+      color: var(--muted);
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--input);
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-top: 3px;
+    }
+
+    .switch {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-weight: 600;
+      user-select: none;
+    }
+
+    .switch input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--input);
+    }
+
+    .formula-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 18px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
+    }
+
+    .formula {
+      display: grid;
+      grid-template-columns: 12px 1fr;
+      gap: 10px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    .swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+    }
+
+    .swatch.input {
+      background: var(--input);
+    }
+
+    .swatch.output {
+      background: var(--output);
+    }
+
+    .swatch.hidden {
+      background: var(--hidden);
+    }
+
+    .content {
+      display: grid;
+      gap: 18px;
+    }
+
+    .plot-panel {
+      padding: 18px;
+    }
+
+    .plot-wrap {
+      width: 100%;
+      height: 520px;
+      min-height: 360px;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .metric {
+      padding: 14px 16px;
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 0.83rem;
+      margin-bottom: 5px;
+    }
+
+    .metric-value {
+      font-weight: 750;
+      font-size: 1.08rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .table-panel {
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-variant-numeric: tabular-nums;
+    }
+
+    thead {
+      background: #eef2f7;
+    }
+
+    th,
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    th:first-child,
+    td:first-child {
+      text-align: left;
+    }
+
+    th {
+      color: #354052;
+      font-size: 0.86rem;
+      font-weight: 750;
+    }
+
+    td {
+      color: #273244;
+      font-size: 0.92rem;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .note {
+      padding: 14px 16px;
+      color: var(--muted);
+      font-size: 0.93rem;
+    }
+
+    @media (max-width: 860px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .controls {
+        position: static;
+      }
+
+      .summary {
+        grid-template-columns: 1fr;
+      }
+
+      .plot-wrap {
+        height: 420px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>NN Dimension Scaling</h1>
+      <p class="subtitle">
+        Compare the hidden layer width 2^N with d_in = ℓ + 2 and d_out = 6 2^ℓ - 2 for the two-site ℓ-loop family.
+      </p>
+    </header>
+
+    <div class="layout">
+      <aside class="panel controls">
+        <div class="control">
+          <label for="nSlider">
+            <span>Hidden width exponent N</span>
+            <span class="value" id="nValue">8</span>
+          </label>
+          <input id="nSlider" type="range" min="4" max="14" step="1" value="8">
+        </div>
+
+        <div class="control">
+          <label for="ellSlider">
+            <span>Maximum loop order ℓ</span>
+            <span class="value" id="ellValue">10</span>
+          </label>
+          <input id="ellSlider" type="range" min="2" max="18" step="1" value="10">
+        </div>
+
+        <div class="control toggle-row">
+          <span class="switch">
+            <input id="logToggle" type="checkbox">
+            <span>Log scale</span>
+          </span>
+        </div>
+
+        <div class="formula-list">
+          <div class="formula">
+            <span class="swatch input"></span>
+          <span>d_in = ℓ + 2</span>
+          </div>
+          <div class="formula">
+            <span class="swatch output"></span>
+          <span>d_out = 6 2^ℓ - 2</span>
+          </div>
+          <div class="formula">
+            <span class="swatch hidden"></span>
+            <span>hidden width = 2^N</span>
+          </div>
+        </div>
+      </aside>
+
+      <section class="content">
+        <section class="panel plot-panel">
+          <div class="plot-wrap">
+            <canvas id="plotCanvas" aria-label="Dimension comparison plot"></canvas>
+          </div>
+        </section>
+
+        <section class="summary">
+          <div class="panel metric">
+            <div class="metric-label">Hidden width</div>
+            <div class="metric-value" id="hiddenMetric">256</div>
+          </div>
+          <div class="panel metric">
+            <div class="metric-label">First ℓ with d_out &gt; 2^N</div>
+            <div class="metric-value" id="crossMetric">6</div>
+          </div>
+          <div class="panel metric">
+            <div class="metric-label">d_out at maximum ℓ</div>
+            <div class="metric-value" id="maxOutMetric">6142</div>
+          </div>
+        </section>
+
+        <section class="panel table-panel">
+          <table>
+            <thead>
+              <tr>
+                <th>ℓ</th>
+                <th>d_in</th>
+                <th>d_out</th>
+                <th>2^N</th>
+                <th>d_out / 2^N</th>
+              </tr>
+            </thead>
+            <tbody id="dataBody"></tbody>
+          </table>
+        </section>
+
+        <section class="panel note" id="noteText"></section>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const nSlider = document.getElementById("nSlider");
+    const ellSlider = document.getElementById("ellSlider");
+    const logToggle = document.getElementById("logToggle");
+    const nValue = document.getElementById("nValue");
+    const ellValue = document.getElementById("ellValue");
+    const canvas = document.getElementById("plotCanvas");
+    const dataBody = document.getElementById("dataBody");
+    const hiddenMetric = document.getElementById("hiddenMetric");
+    const crossMetric = document.getElementById("crossMetric");
+    const maxOutMetric = document.getElementById("maxOutMetric");
+    const noteText = document.getElementById("noteText");
+
+    const colors = {
+      input: "#2f6fdd",
+      output: "#c33d2e",
+      hidden: "#23845d",
+      text: "#18202f",
+      muted: "#667085",
+      grid: "#e7eaf0",
+      border: "#b7bfcc"
+    };
+
+    function dIn(ell) {
+      return ell + 2;
+    }
+
+    function dOut(ell) {
+      return 6 * Math.pow(2, ell) - 2;
+    }
+
+    function hiddenWidth(n) {
+      return Math.pow(2, n);
+    }
+
+    function formatNumber(value) {
+      return value.toLocaleString("en-US", { maximumFractionDigits: 4 });
+    }
+
+    function formatRatio(value) {
+      if (value >= 100) {
+        return value.toLocaleString("en-US", { maximumFractionDigits: 1 });
+      }
+      if (value >= 10) {
+        return value.toLocaleString("en-US", { maximumFractionDigits: 2 });
+      }
+      return value.toLocaleString("en-US", { maximumFractionDigits: 4 });
+    }
+
+    function buildData(n, ellMax) {
+      const hidden = hiddenWidth(n);
+      const rows = [];
+      for (let ell = 0; ell <= ellMax; ell += 1) {
+        rows.push({
+          ell,
+          input: dIn(ell),
+          output: dOut(ell),
+          hidden
+        });
+      }
+      return rows;
+    }
+
+    function firstCrossing(n, limit) {
+      const hidden = hiddenWidth(n);
+      for (let ell = 0; ell <= limit; ell += 1) {
+        if (dOut(ell) > hidden) return ell;
+      }
+      return null;
+    }
+
+    function niceTicks(minValue, maxValue, count) {
+      const span = Math.max(maxValue - minValue, 1);
+      const rawStep = span / Math.max(count, 1);
+      const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
+      const residual = rawStep / magnitude;
+      let niceStep = magnitude;
+      if (residual > 5) niceStep = 10 * magnitude;
+      else if (residual > 2) niceStep = 5 * magnitude;
+      else if (residual > 1) niceStep = 2 * magnitude;
+
+      const first = Math.ceil(minValue / niceStep) * niceStep;
+      const ticks = [];
+      for (let value = first; value <= maxValue + niceStep * 0.5; value += niceStep) {
+        ticks.push(value);
+      }
+      return ticks;
+    }
+
+    function drawPlot(rows, useLog) {
+      const ctx = canvas.getContext("2d");
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.max(1, Math.round(rect.width * dpr));
+      canvas.height = Math.max(1, Math.round(rect.height * dpr));
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const width = rect.width;
+      const height = rect.height;
+      const margin = { top: 26, right: 28, bottom: 58, left: 72 };
+      const plotWidth = width - margin.left - margin.right;
+      const plotHeight = height - margin.top - margin.bottom;
+
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, width, height);
+
+      const ellMax = rows[rows.length - 1].ell;
+      const maxLinear = Math.max(...rows.flatMap(row => [row.input, row.output, row.hidden]));
+      const minLinear = 0;
+      const yMin = useLog ? 1 : minLinear;
+      const yMax = useLog ? Math.pow(10, Math.ceil(Math.log10(maxLinear))) : maxLinear * 1.08;
+
+      const mapX = ell => margin.left + (ell / ellMax) * plotWidth;
+      const mapY = value => {
+        const adjusted = useLog ? Math.log10(Math.max(value, 1)) : value;
+        const low = useLog ? Math.log10(yMin) : yMin;
+        const high = useLog ? Math.log10(yMax) : yMax;
+        return margin.top + (1 - (adjusted - low) / (high - low)) * plotHeight;
+      };
+
+      ctx.strokeStyle = colors.grid;
+      ctx.lineWidth = 1;
+      ctx.font = "12px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
+      ctx.fillStyle = colors.muted;
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+
+      let yTicks;
+      if (useLog) {
+        yTicks = [];
+        for (let p = 0; p <= Math.ceil(Math.log10(yMax)); p += 1) {
+          yTicks.push(Math.pow(10, p));
+        }
+      } else {
+        yTicks = niceTicks(0, yMax, 6);
+      }
+
+      yTicks.forEach(value => {
+        const y = mapY(value);
+        ctx.beginPath();
+        ctx.moveTo(margin.left, y);
+        ctx.lineTo(width - margin.right, y);
+        ctx.stroke();
+        ctx.fillText(formatNumber(value), margin.left - 10, y);
+      });
+
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      const xStep = Math.max(1, Math.ceil(ellMax / 10));
+      for (let ell = 0; ell <= ellMax; ell += xStep) {
+        const x = mapX(ell);
+        ctx.beginPath();
+        ctx.moveTo(x, margin.top);
+        ctx.lineTo(x, height - margin.bottom);
+        ctx.stroke();
+        ctx.fillText(String(ell), x, height - margin.bottom + 12);
+      }
+
+      ctx.strokeStyle = colors.border;
+      ctx.strokeRect(margin.left, margin.top, plotWidth, plotHeight);
+
+      ctx.fillStyle = colors.text;
+      ctx.font = "13px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
+      ctx.fillText("loop order ℓ", margin.left + plotWidth / 2, height - 28);
+      ctx.save();
+      ctx.translate(22, margin.top + plotHeight / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText(useLog ? "dimension, log scale" : "dimension", 0, 0);
+      ctx.restore();
+
+      drawSeries(ctx, rows, "input", colors.input, mapX, mapY);
+      drawSeries(ctx, rows, "output", colors.output, mapX, mapY);
+      drawSeries(ctx, rows, "hidden", colors.hidden, mapX, mapY);
+
+      drawLegend(ctx, width - margin.right - 236, margin.top + 8);
+    }
+
+    function drawSeries(ctx, rows, key, color, mapX, mapY) {
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      rows.forEach((row, index) => {
+        const x = mapX(row.ell);
+        const y = mapY(row[key]);
+        if (index === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      rows.forEach(row => {
+        const x = mapX(row.ell);
+        const y = mapY(row[key]);
+        ctx.beginPath();
+        ctx.arc(x, y, 3.2, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    function drawLegend(ctx, x, y) {
+      const items = [
+        ["d_in = ℓ + 2", colors.input],
+        ["d_out = 6 2^ℓ - 2", colors.output],
+        ["hidden width = 2^N", colors.hidden]
+      ];
+      ctx.font = "12px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "left";
+
+      items.forEach((item, index) => {
+        const rowY = y + index * 22;
+        ctx.fillStyle = item[1];
+        ctx.fillRect(x, rowY - 5, 12, 10);
+        ctx.fillStyle = colors.text;
+        ctx.fillText(item[0], x + 20, rowY);
+      });
+    }
+
+    function updateTable(rows) {
+      dataBody.innerHTML = "";
+      rows.forEach(row => {
+        const tr = document.createElement("tr");
+        const ratio = row.output / row.hidden;
+        tr.innerHTML = `
+          <td>${row.ell}</td>
+          <td>${formatNumber(row.input)}</td>
+          <td>${formatNumber(row.output)}</td>
+          <td>${formatNumber(row.hidden)}</td>
+          <td>${formatRatio(ratio)}</td>
+        `;
+        dataBody.appendChild(tr);
+      });
+    }
+
+    function update() {
+      const n = Number(nSlider.value);
+      const ellMax = Number(ellSlider.value);
+      const rows = buildData(n, ellMax);
+      const hidden = hiddenWidth(n);
+      const crossing = firstCrossing(n, 60);
+      const useLog = logToggle.checked;
+
+      nValue.textContent = String(n);
+      ellValue.textContent = String(ellMax);
+      hiddenMetric.textContent = formatNumber(hidden);
+      crossMetric.textContent = crossing === null ? "none up to ℓ = 60" : String(crossing);
+      maxOutMetric.textContent = formatNumber(dOut(ellMax));
+
+      if (crossing === null) {
+        noteText.textContent = `For N = ${n}, d_out does not exceed 2^N up to ℓ = 60 in this scan.`;
+      } else {
+        const before = crossing > 0 ? `d_out(${crossing - 1}) = ${formatNumber(dOut(crossing - 1))}` : "";
+        const current = `d_out(${crossing}) = ${formatNumber(dOut(crossing))}`;
+        noteText.textContent = `For N = ${n}, the first loop order with d_out > 2^N is ℓ = ${crossing}. ${before}${before ? ", while " : ""}${current}.`;
+      }
+
+      drawPlot(rows, useLog);
+      updateTable(rows);
+    }
+
+    [nSlider, ellSlider, logToggle].forEach(control => {
+      control.addEventListener("input", update);
+      control.addEventListener("change", update);
+    });
+
+    window.addEventListener("resize", update);
+    update();
+  </script>
+</body>
+</html>
